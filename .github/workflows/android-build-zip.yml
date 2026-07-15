@@ -1,0 +1,57 @@
+name: Android APK Build and Zip
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          target: android-34
+          components: |
+            build-tools;34.0.0
+            platform-tools
+            platforms;android-34
+
+      - name: Print environment
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "PATH=$PATH"
+
+      - name: Build debug APK
+        working-directory: SWRLZ_NODE_HOST
+        run: ./gradlew --no-daemon assembleDebug -Dorg.gradle.jvmargs='-Xmx1024m -XX:MaxMetaspaceSize=512m'
+
+      - name: Package APK into zip
+        working-directory: SWRLZ_NODE_HOST
+        run: |
+          mkdir -p build/apk-zip
+          cp app/build/outputs/apk/debug/app-debug.apk build/apk-zip/
+          source_zip=$(git log --pretty=format:'%h %s' -n 1 -- .)
+          echo "$source_zip" > build/apk-zip/build-source.txt
+          zip -j build/apk-zip/app-debug-latest-source.zip build/apk-zip/app-debug.apk build/apk-zip/build-source.txt
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: swrlz-node-host-apk-zip
+          path: SWRLZ_NODE_HOST/build/apk-zip/app-debug-latest-source.zip
